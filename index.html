@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粵語字詞彈弓大作戰 - 彈弓遊戲學中文</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .text-shadow-game {
+            text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000, 0px 4px 6px rgba(0,0,0,0.5);
+        }
+        .btn-bounce {
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .btn-bounce:active {
+            transform: scale(0.92);
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #f59e0b;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- Top Header Bar -->
+    <header class="bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-yellow-400 border-2 border-white flex items-center justify-center text-red-600 font-extrabold text-xl shadow">
+                    <i class="fa-solid fa-feather-pointed"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black tracking-wider text-shadow-game">字詞彈弓大作戰</h1>
+                    <p class="text-xs text-yellow-200 font-bold hidden sm:block">拉彈弓、答啱詞語，發射石頭擊倒城堡！</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="showStartModal()" class="bg-yellow-400 hover:bg-yellow-300 text-red-900 font-extrabold px-3.5 py-1.5 rounded-xl text-xs sm:text-sm shadow flex items-center gap-1.5 transition btn-bounce">
+                    <i class="fa-solid fa-rotate-right"></i> 重新開始
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="flex-grow flex flex-col items-center justify-center p-2 sm:p-4 max-w-5xl mx-auto w-full">
+        <div id="tab-game" class="w-full flex flex-col items-center">
+            <!-- Game Status Bar -->
+            <div class="w-full bg-slate-800 rounded-t-2xl p-3 flex justify-between items-center text-white border-b-2 border-slate-700">
+                <div class="flex items-center gap-3 text-xs sm:text-sm">
+                    <span class="bg-red-500 text-xs px-3 py-1 rounded-full font-black tracking-wide">第 <span id="current-round-num">1</span> / 5 回合</span>
+                    <span id="player-display-info" class="text-amber-300 font-bold hidden sm:inline"></span>
+                </div>
+                <div class="flex items-center gap-4 text-sm font-bold">
+                    <div class="text-yellow-400"><i class="fa-solid fa-star mr-1"></i>得分: <span id="game-score">0</span> / 100</div>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="relative w-full aspect-[16/9] max-h-[520px] bg-sky-200 rounded-b-2xl shadow-2xl overflow-hidden border-4 border-slate-800">
+                <canvas id="gameCanvas" class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+
+                <!-- Drag Instruction Banner -->
+                <div id="drag-hint" class="absolute top-3 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold pointer-events-none animate-pulse flex items-center gap-2 z-10 border border-yellow-400/40">
+                    <i class="fa-solid fa-hand-pointer text-yellow-300"></i> 按住彈弓拉開石頭，瞄準城堡後放開！
+                </div>
+
+                <!-- Grass Area Integrated Quiz Panel -->
+                <div id="quiz-panel" class="absolute bottom-2 left-2 right-2 bg-slate-900/95 border-3 border-amber-400 rounded-2xl p-3 shadow-2xl text-white z-20 transition-all duration-300 transform translate-y-full opacity-0 pointer-events-none backdrop-blur-md">
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+                        <!-- Sentence & Audio Button -->
+                        <div class="flex items-center gap-2.5 w-full md:w-auto flex-1 bg-amber-950/60 p-2.5 rounded-xl border border-amber-500/40">
+                            <button onclick="speakQuizSentence()" class="bg-amber-400 hover:bg-amber-300 text-amber-950 p-2.5 rounded-xl font-black shadow flex-shrink-0 transition active:scale-95" title="聆聽廣東話句子">
+                                <i class="fa-solid fa-volume-high text-lg"></i>
+                            </button>
+                            <div class="flex flex-col flex-1">
+                                <div class="text-sm sm:text-base font-bold leading-snug text-amber-100" id="quiz-sentence">
+                                    這窗簾很<span class="text-yellow-400 underline decoration-2 underline-offset-4 font-black">__</span>，不能遮擋陽光。
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Answer Options Grid -->
+                        <div id="quiz-options" class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
+                            <!-- Options dynamically generated -->
+                        </div>
+                    </div>
+
+                    <!-- Feedback Banner -->
+                    <div id="quiz-feedback" class="text-xs sm:text-sm font-bold text-center mt-2 min-h-[22px] bg-slate-800/80 p-1.5 rounded-xl border border-slate-700"></div>
+                </div>
+
+                <!-- Start Game / Student Details Overlay Modal -->
+                <div id="start-modal" class="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center p-4 z-50 text-white text-center overflow-y-auto">
+                    <div class="bg-slate-800 border-4 border-amber-400 rounded-3xl p-5 max-w-lg w-full shadow-2xl my-auto">
+                        <div class="text-yellow-400 text-4xl mb-2 animate-bounce">
+                            <i class="fa-solid fa-feather-pointed"></i>
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-black text-yellow-300 mb-1 text-shadow-game">粵語字詞彈弓大作戰</h2>
+                        <p class="text-slate-300 text-xs sm:text-sm mb-4">請填寫學生資料並閱讀遊戲說明：</p>
+
+                        <!-- Student Form Inputs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-left">
+                            <div>
+                                <label class="block text-xs font-bold text-amber-300 mb-1"><i class="fa-solid fa-user mr-1"></i>學生遊戲暱稱 / 姓名</label>
+                                <input type="text" id="input-student-name" placeholder="例如：陳小明" class="w-full bg-slate-700 border-2 border-slate-600 focus:border-yellow-400 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-amber-300 mb-1"><i class="fa-solid fa-graduation-cap mr-1"></i>班級</label>
+                                <input type="text" id="input-student-class" placeholder="例如：3A" class="w-full bg-slate-700 border-2 border-slate-600 focus:border-yellow-400 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Game Rules Description Box -->
+                        <div class="bg-slate-700/80 rounded-2xl p-3.5 mb-4 text-left border border-slate-600 space-y-2 text-xs text-slate-200">
+                            <h3 class="font-black text-yellow-300 text-sm flex items-center gap-1.5 border-b border-slate-600 pb-1.5">
+                                <i class="fa-solid fa-scroll"></i> 遊戲規則說明：
+                            </h3>
+                            <ul class="space-y-1.5 list-disc list-inside text-slate-200">
+                                <li><strong>🎯 玩法：</strong>用手指/滑鼠拉動彈弓瞄準怪獸城堡，放開手後會彈出字詞挑戰。</li>
+                                <li><strong>🔥 答啱先中：</strong>答對問題後 <span class="text-yellow-300 font-bold">1 秒</span> 會發射石頭，擊倒城堡與怪獸！</li>
+                                <li><strong>❌ 答錯扣分：</strong>答錯不會發射石頭，題目和例句保持不變，直到答對；答對後再發射時會轉換同一字詞的另一句例句，但該關卡得分將變為 <span class="text-red-400 font-bold">0 分</span>。</li>
+                                <li><strong>⭐ 計分機制：</strong>全遊戲共 5 回合，滿分 <span class="text-yellow-400 font-bold">100 分</span>（每關完全答對得 <span class="text-emerald-400 font-bold">20 分</span>；曾錯題得 <span class="text-red-400 font-bold">0 分</span>）。</li>
+                                <li><strong>🏆 通關條件：</strong>必須答對問題並擊倒全部怪獸，方可晉級下一關！</li>
+                            </ul>
+                        </div>
+
+                        <button onclick="startGameFromModal()" class="bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black py-3 px-8 rounded-xl shadow-lg btn-bounce text-base w-full flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle-play text-xl"></i> 開始挑戰遊戲
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Level Win Modal -->
+                <div id="level-win-modal" class="hidden absolute inset-0 bg-black/75 flex flex-col items-center justify-center p-4 z-30 text-white text-center">
+                    <div class="bg-slate-800 border-4 border-yellow-400 rounded-3xl p-5 max-w-md w-full shadow-2xl transform scale-100 transition">
+                        <div class="text-yellow-400 text-4xl mb-1">
+                            <i class="fa-solid fa-trophy"></i>
+                        </div>
+                        <h2 class="text-2xl font-black text-yellow-300 mb-1 text-shadow-game">過關！學識字詞！</h2>
+                        <p class="text-slate-300 text-xs mb-3">成功答對字詞並擊倒全部敵！</p>
+                        
+                        <!-- Current Word Summary Card -->
+                        <div class="bg-slate-700 rounded-xl p-3 mb-4 text-left border border-slate-600">
+                            <div class="flex justify-between items-center mb-1">
+                                <div>
+                                    <span class="text-xl font-bold text-yellow-300" id="win-word-title">薄</span>
+                                </div>
+                                <button id="win-speech-btn" class="text-xs bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold px-2 py-1 rounded flex items-center gap-1 active:scale-95 transition">
+                                    <i class="fa-solid fa-volume-high"></i> 粵語發音
+                                </button>
+                            </div>
+                            <p class="text-xs text-slate-200 mb-2" id="win-word-meaning">不厚的。</p>
+                            <p class="text-xs text-emerald-300 bg-slate-800/90 p-2 rounded italic border border-slate-700" id="win-word-example">這窗簾很薄，不能遮擋陽光。</p>
+                        </div>
+
+                        <button onclick="nextLevel()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black py-2.5 px-6 rounded-xl shadow btn-bounce text-base w-full">
+                            下一關 <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Final Game Complete Modal -->
+                <div id="game-complete-modal" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-4 z-40 text-white text-center overflow-y-auto">
+                    <div class="bg-slate-800 border-4 border-amber-400 rounded-3xl p-5 max-w-lg w-full shadow-2xl my-auto">
+                        <div class="text-yellow-400 text-4xl mb-1 animate-bounce">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-black text-yellow-300 mb-1 text-shadow-game">恭喜完成全部關卡！</h2>
+                        <p class="text-slate-300 text-xs sm:text-sm mb-3" id="summary-student-name">學生：-- (班別：--)</p>
+                        
+                        <div class="bg-slate-700/80 p-3 rounded-xl mb-3 border border-slate-600 flex justify-around items-center">
+                            <div>
+                                <p class="text-xs text-slate-400">總得分</p>
+                                <p class="text-2xl font-black text-yellow-400"><span id="final-score">0</span> / 100</p>
+                            </div>
+                            <div class="h-8 w-px bg-slate-600"></div>
+                            <div>
+                                <p class="text-xs text-slate-400">完成關卡</p>
+                                <p class="text-2xl font-black text-emerald-400">5 / 5</p>
+                            </div>
+                            <div class="h-8 w-px bg-slate-600"></div>
+                            <div>
+                                <p class="text-xs text-slate-400">答題總次數</p>
+                                <p id="final-questions-count" class="text-2xl font-black text-sky-400">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Per-Round Score Breakdown -->
+                        <div class="text-left mb-3">
+                            <h3 class="text-xs font-bold text-yellow-300 mb-1.5 flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-check"></i> 每關得分紀錄 (20分/關，曾錯題 0分)
+                            </h3>
+                            <div id="round-scores-list" class="max-h-28 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar text-xs">
+                            </div>
+                        </div>
+
+                        <!-- Recommended Review Words -->
+                        <div class="text-left mb-4">
+                            <h3 class="text-xs font-bold text-amber-300 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+                                <i class="fa-solid fa-book-open"></i> 建議重溫的詞語 (曾錯題)
+                            </h3>
+                            <div id="review-words-list" class="max-h-36 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                            </div>
+                        </div>
+
+                        <button onclick="showStartModal()" class="bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black py-2.5 px-8 rounded-xl shadow-lg btn-bounce text-base w-full">
+                            <i class="fa-solid fa-rotate-right"></i> 再玩一次
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800 text-slate-400 text-xs py-3 text-center border-t border-slate-700">
+        <p>小學粵語字詞大作戰 &bull; 專注一字詞 &bull; 廣東話語音發音 &bull; 答啱問題兼摧毀全部怪獸通關</p>
+    </footer>
+
+    <script>
+        const VOCAB_DATA = [
+            {
+                id: 1,
+                word: "薄",
+                meaning: "不厚的。",
+                examples: [
+                    "這窗簾很薄，不能遮擋陽光。",
+                    "她在一片白麪包上，塗了一層薄奶油。",
+                    "現今的科技十分先進，電視機、手機等電子產品已變得很薄了。"
+                ],
+                options: [
+                    { word: "薄" },
+                    { word: "厚" },
+                    { word: "亂糟糟" },
+                    { word: "分散" }
+                ]
+            },
+            {
+                id: 2,
+                word: "聚集",
+                meaning: "聚合在一起。",
+                examples: [
+                    "參加宿營的同學，都聚集在操場，等候點名。",
+                    "這裏稍後會有歌星表演，吸引了很多市民聚集。",
+                    "請大家切勿在通道中聚集，以免對其他人造成不便。"
+                ],
+                options: [
+                    { word: "聚集" },
+                    { word: "分散" },
+                    { word: "橫" },
+                    { word: "一匹匹" }
+                ]
+            },
+            {
+                id: 3,
+                word: "一羣羣",
+                meaning: "羣，由個體集合而成的人、物團體。一羣羣即是很多羣的意思。",
+                examples: [
+                    "秋天到了，一羣羣大雁往南飛。",
+                    "一位國際級演員在這個商場剪綵，引來一羣羣湊熱鬧的人。",
+                    "國家足球隊在國際賽上取勝，一羣羣市民在街上歡呼慶祝。"
+                ],
+                options: [
+                    { word: "一羣羣" },
+                    { word: "一匹匹" },
+                    { word: "小島" },
+                    { word: "豎" }
+                ]
+            },
+            {
+                id: 4,
+                word: "分散",
+                meaning: "分在各處或分開散佈。",
+                examples: [
+                    "幼稚園畢業以後，同學們分散到不同的小學就讀。",
+                    "妹妹的哭聲分散了我的注意力，使我沒法專心做家課。",
+                    "請你先把精神集中在這件重要的事情上，不要把精神分散在不同的工作上。"
+                ],
+                options: [
+                    { word: "分散" },
+                    { word: "聚集" },
+                    { word: "厚" },
+                    { word: "亂糟糟" }
+                ]
+            },
+            {
+                id: 5,
+                word: "一匹匹",
+                meaning: "匹，計算馬、驢等牲畜的量詞。一匹匹即是很多匹的意思。",
+                examples: [
+                    "一匹匹野馬從遠處奔來，原野上的羊羣都被嚇得四散走避。",
+                    "農場中一匹匹馬看起來都差不多，難以辨別哪一匹才是「千里馬」。",
+                    "在這個介紹中東地區的電視節目中，我看到一匹匹駱駝背着貨物走路。"
+                ],
+                options: [
+                    { word: "一匹匹" },
+                    { word: "一羣羣" },
+                    { word: "小島" },
+                    { word: "橫" }
+                ]
+            },
+            {
+                id: 6,
+                word: "厚",
+                meaning: "不薄的。",
+                examples: [
+                    "這本書太厚了，難以在一天內讀完。",
+                    "儘管他已穿上這件厚大衣，但仍感到寒冷。",
+                    "這種厚包是台灣的特色食品，你也試試吧！"
+                ],
+                options: [
+                    { word: "厚" },
+                    { word: "薄" },
+                    { word: "豎" },
+                    { word: "聚集" }
+                ]
+            },
+            {
+                id: 7,
+                word: "小島",
+                meaning: "在海中、湖中或河中、四面環水的小陸地。",
+                examples: [
+                    "這一座大橋把小島與大陸連接起來。",
+                    "這小島遠離城市，是一個不錯的度假地點。",
+                    "由於這個小島人煙稀少，所以空氣特別清新。"
+                ],
+                options: [
+                    { word: "小島" },
+                    { word: "橫" },
+                    { word: "一匹匹" },
+                    { word: "分散" }
+                ]
+            },
+            {
+                id: 8,
+                word: "亂糟糟",
+                meaning: "事物或環境雜亂，沒條理。",
+                examples: [
+                    "心兒打開門一看，只見課室一片亂糟糟的，東西也被翻了一地。",
+                    "你的房間經常亂糟糟的，怎會住得舒適呢？",
+                    "媽媽准許我帶同學回家玩耍，但提醒我們不要把家裏的東西弄得亂糟糟。"
+                ],
+                options: [
+                    { word: "亂糟糟" },
+                    { word: "聚集" },
+                    { word: "薄" },
+                    { word: "豎" }
+                ]
+            },
+            {
+                id: 9,
+                word: "橫",
+                meaning: "水平的、東西向的。",
+                examples: [
+                    "螃蟹是橫向行走的。",
+                    "我們不應在紅色人像燈亮着時橫過馬路。",
+                    "一個被颱風吹倒的棚架橫臥在馬路上，正等待市政人員把它移走。"
+                ],
+                options: [
+                    { word: "橫" },
+                    { word: "豎" },
+                    { word: "一羣羣" },
+                    { word: "薄" }
+                ]
+            },
+            {
+                id: 10,
+                word: "豎",
+                meaning: "跟地面垂直或是跟「橫」相對。",
+                examples: [
+                    "這個男生橫看豎看都不像一個富家子弟，倒像一個深山野人。",
+                    "我們書寫「十」字時，要依着「先橫後豎」的筆順規則。",
+                    "中國古書中的文字都是豎排的。"
+                ],
+                options: [
+                    { word: "豎" },
+                    { word: "橫" },
+                    { word: "小島" },
+                    { word: "厚" }
+                ]
+            }
+        ];
+
+        let studentName = "";
+        let studentClass = "";
+        let currentRound = 1;
+        const TOTAL_ROUNDS = 5;
+        let score = 0;
+        let currentQuestion = null;
+        let currentExampleIdx = 0;
+        let roundQuestions = [];
+        let learnedWords = [];
+        let mistakenWordIds = new Set();
+        let currentRoundHasMistake = false;
+        let roundScoreStats = [];
+        let totalQuestionsAnswered = 0;
+        let pendingLaunchPower = { x: 0, y: 0 };
+        let hasAnsweredCorrectlyThisRound = false;
+        let levelCleared = false;
+        let countdownInterval = null;
+        let questionRecords = [];
+
+        let canvas, ctx;
+        let bird = { x: 0, y: 0, radius: 18, vx: 0, vy: 0, isFlying: false, isDragging: false };
+        let slingAnchor = { x: 0, y: 0 };
+        let blocks = [];
+        let pigs = [];
+        let particles = [];
+        let isPowerBoosted = false;
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+        }
+
+        let cantoneseVoice = null;
+        function initVoices() {
+            if ('speechSynthesis' in window) {
+                const updateVoice = () => {
+                    const voices = window.speechSynthesis.getVoices();
+                    cantoneseVoice = voices.find(v => v.lang === 'zh-HK' || v.lang === 'yue-Hant-HK' || v.lang.includes('HK') || v.name.toLowerCase().includes('cantonese') || v.name.toLowerCase().includes('hong kong'))
+                        || voices.find(v => v.lang.startsWith('zh'))
+                        || null;
+                };
+                updateVoice();
+                if (speechSynthesis.onvoiceschanged !== undefined) {
+                    speechSynthesis.onvoiceschanged = updateVoice;
+                }
+            }
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const now = audioCtx.currentTime;
+                
+                if (type === 'stretch') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, now);
+                    osc.frequency.exponentialRampToValueAtTime(250, now + 0.1);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'launch') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'hit') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'wrong') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(120, now + 0.15);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch (e) {
+                console.log('Audio playback error', e);
+            }
+        }
+
+        function speakWordText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const cleanText = String(text).replace(/羣/g, '群').replace(/_+/g, ' ');
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = 'zh-HK';
+                if (cantoneseVoice) {
+                    utterance.voice = cantoneseVoice;
+                }
+                utterance.rate = 0.85;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function speakQuizSentence() {
+            if (currentQuestion && currentQuestion.examples) {
+                const rawSentence = currentQuestion.examples[currentExampleIdx];
+                const cleanSentence = rawSentence.replace(currentQuestion.word, ' ');
+                speakWordText(cleanSentence);
+            }
+        }
+
+        function initLevelStructure() {
+            blocks = [];
+            pigs = [];
+            particles = [];
+            hasAnsweredCorrectlyThisRound = false;
+            currentRoundHasMistake = false;
+            levelCleared = false;
+
+            const w = canvas.width;
+            const h = canvas.height;
+            const groundY = h * 0.82;
+
+            slingAnchor = { x: w * 0.18, y: groundY - 70 };
+            resetBirdPos();
+
+            const levelType = (currentRound - 1) % 5;
+
+            if (levelType === 0) {
+                const baseX = w * 0.7;
+                const b1 = { x: baseX - 40, y: groundY - 50, w: 20, h: 100, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#b45309' };
+                const b2 = { x: baseX + 40, y: groundY - 50, w: 20, h: 100, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#b45309' };
+                const b3 = { x: baseX, y: groundY - 105, w: 110, h: 16, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#d97706' };
+                blocks.push(b1, b2, b3);
+                
+                pigs.push({ x: baseX, y: groundY - 20, radius: 18, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#22c55e', type: 'normal' });
+                pigs.push({ x: baseX, y: b3.y - b3.h/2 - 16, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#16a34a', type: 'normal' });
+            } else if (levelType === 1) {
+                // 第 2 關：三層金字塔／階梯形木塔
+                const baseX = w * 0.73;
+                const woodColor = '#92400e';
+                const platformColor = '#d97706';
+
+                // 底層：三支木柱與一塊長木板
+                const bottomLeft = { x: baseX - 70, y: groundY - 42, w: 20, h: 84, health: 100, maxHealth: 100, vx: 0, vy: 0, color: woodColor };
+                const bottomCenter = { x: baseX, y: groundY - 42, w: 20, h: 84, health: 100, maxHealth: 100, vx: 0, vy: 0, color: woodColor };
+                const bottomRight = { x: baseX + 70, y: groundY - 42, w: 20, h: 84, health: 100, maxHealth: 100, vx: 0, vy: 0, color: woodColor };
+                const bottomPlatform = { x: baseX, y: groundY - 91, w: 176, h: 16, health: 100, maxHealth: 100, vx: 0, vy: 0, color: platformColor };
+
+                // 中層：兩支向內收窄的木柱與短木板
+                const middleLeft = { x: baseX - 36, y: groundY - 139, w: 20, h: 80, health: 100, maxHealth: 100, vx: 0, vy: 0, color: woodColor };
+                const middleRight = { x: baseX + 36, y: groundY - 139, w: 20, h: 80, health: 100, maxHealth: 100, vx: 0, vy: 0, color: woodColor };
+                const middlePlatform = { x: baseX, y: groundY - 187, w: 100, h: 16, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#f59e0b' };
+
+                blocks.push(bottomLeft, bottomCenter, bottomRight, bottomPlatform, middleLeft, middleRight, middlePlatform);
+
+                // 底層、中層與頂層怪獸
+                pigs.push({ x: baseX - 35, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#a855f7', type: 'purple' });
+                pigs.push({ x: baseX + 35, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#f97316', type: 'orange' });
+                pigs.push({ x: baseX, y: bottomPlatform.y - bottomPlatform.h / 2 - 18, radius: 18, health: 90, maxHealth: 90, vx: 0, vy: 0, color: '#22c55e', type: 'normal' });
+                pigs.push({ x: baseX, y: middlePlatform.y - middlePlatform.h / 2 - 19, radius: 19, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#eab308', type: 'gold' });
+            } else if (levelType === 2) {
+                const baseX = w * 0.73;
+                const b1 = { x: baseX - 50, y: groundY - 35, w: 20, h: 70, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#9a3412' };
+                const b2 = { x: baseX + 50, y: groundY - 35, w: 20, h: 70, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#9a3412' };
+                const b3 = { x: baseX, y: groundY - 75, w: 130, h: 16, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#ea580c' };
+                const b4 = { x: baseX, y: b3.y - 38, w: 20, h: 60, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#9a3412' };
+                blocks.push(b1, b2, b3, b4);
+
+                pigs.push({ x: baseX - 20, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#14b8a6', type: 'teal' });
+                pigs.push({ x: baseX + 20, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#22c55e', type: 'normal' });
+                pigs.push({ x: baseX, y: b4.y - b4.h/2 - 18, radius: 18, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#eab308', type: 'gold' });
+            } else if (levelType === 3) {
+                const baseX = w * 0.72;
+                const b1 = { x: baseX - 60, y: groundY - 60, w: 22, h: 120, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#b45309' };
+                const b2 = { x: baseX + 20, y: groundY - 60, w: 22, h: 120, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#b45309' };
+                const b3 = { x: baseX - 20, y: groundY - 128, w: 120, h: 18, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#f59e0b' };
+                blocks.push(b1, b2, b3);
+
+                pigs.push({ x: baseX - 20, y: groundY - 20, radius: 17, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#ec4899', type: 'pink' });
+                pigs.push({ x: baseX - 20, y: b3.y - b3.h/2 - 18, radius: 18, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#15803d', type: 'helmet' });
+                pigs.push({ x: baseX + 60, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#06b6d4', type: 'cyan' });
+            } else {
+                const baseX = w * 0.75;
+                const b1 = { x: baseX - 60, y: groundY - 45, w: 20, h: 90, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#78350f' };
+                const b2 = { x: baseX, y: groundY - 45, w: 20, h: 90, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#78350f' };
+                const b3 = { x: baseX + 60, y: groundY - 45, w: 20, h: 90, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#78350f' };
+                const b4 = { x: baseX, y: groundY - 98, w: 150, h: 18, health: 100, maxHealth: 100, vx: 0, vy: 0, color: '#d97706' };
+                blocks.push(b1, b2, b3, b4);
+
+                pigs.push({ x: baseX - 30, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#8b5cf6', type: 'violet' });
+                pigs.push({ x: baseX, y: b4.y - b4.h/2 - 20, radius: 20, health: 120, maxHealth: 120, vx: 0, vy: 0, color: '#16a34a', type: 'crown' });
+                pigs.push({ x: baseX + 30, y: groundY - 20, radius: 16, health: 80, maxHealth: 80, vx: 0, vy: 0, color: '#ef4444', type: 'crimson' });
+            }
+        }
+
+        function resetBirdPos() {
+            bird.x = slingAnchor.x;
+            bird.y = slingAnchor.y;
+            bird.vx = 0;
+            bird.vy = 0;
+            bird.isFlying = false;
+            bird.isDragging = false;
+            isPowerBoosted = false;
+        }
+
+        // 使用 Fisher-Yates 洗牌演算法，確保每次重新開始遊戲時隨機抽取 5 個不同的字詞
+        function selectQuestionsForGame() {
+            const array = [...VOCAB_DATA];
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            roundQuestions = array.slice(0, TOTAL_ROUNDS);
+        }
+
+        // 隨機選擇例句索引（若有多於句例句，避免連續重複同一句）
+        function pickRandomExampleIdx(currentIdx = -1) {
+            if (!currentQuestion || !currentQuestion.examples || currentQuestion.examples.length === 0) return 0;
+            if (currentQuestion.examples.length === 1) return 0;
+            let newIdx;
+            do {
+                newIdx = Math.floor(Math.random() * currentQuestion.examples.length);
+            } while (newIdx === currentIdx && currentQuestion.examples.length > 1);
+            return newIdx;
+        }
+
+        function setCurrentLevelWord() {
+            currentQuestion = roundQuestions[currentRound - 1];
+            currentExampleIdx = pickRandomExampleIdx();
+            questionRecords[currentRound - 1] = {
+                questionNumber: currentRound,
+                word: currentQuestion.word,
+                attempts: [],
+                completed: false,
+                score: 0,
+                submittedAt: ''
+            };
+            document.getElementById('current-round-num').innerText = currentRound;
+            document.getElementById('game-score').innerText = score;
+            document.getElementById('drag-hint').classList.remove('hidden');
+        }
+
+        function showStartModal() {
+            document.getElementById('start-modal').classList.remove('hidden');
+            document.getElementById('level-win-modal').classList.add('hidden');
+            document.getElementById('game-complete-modal').classList.add('hidden');
+            closeQuizModal();
+        }
+
+        function startGameFromModal() {
+            const nameInput = document.getElementById('input-student-name').value.trim();
+            const classInput = document.getElementById('input-student-class').value.trim();
+
+            if (!nameInput) {
+                alert('請輸入學生遊戲暱稱或姓名以開始遊戲！');
+                return;
+            }
+
+            studentName = nameInput;
+            studentClass = classInput || "無紀錄";
+            questionRecords = [];
+
+            document.getElementById('player-display-info').innerText = `👤 ${studentName} (${studentClass})`;
+            document.getElementById('start-modal').classList.add('hidden');
+
+            restartFullGame();
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('gameCanvas').parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            initLevelStructure();
+        }
+
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function handleStart(e) {
+            if (bird.isFlying) return;
+            const pos = getCanvasCoords(e);
+            const dist = Math.hypot(pos.x - slingAnchor.x, pos.y - slingAnchor.y);
+            if (dist < 60) {
+                bird.isDragging = true;
+                if (e.cancelable) e.preventDefault();
+                playSound('stretch');
+            }
+        }
+
+        function handleMove(e) {
+            if (!bird.isDragging) return;
+            if (e.cancelable) e.preventDefault();
+            const pos = getCanvasCoords(e);
+            const dx = pos.x - slingAnchor.x;
+            const dy = pos.y - slingAnchor.y;
+            const maxDrag = 80;
+            const angle = Math.atan2(dy, dx);
+            const dist = Math.min(Math.hypot(dx, dy), maxDrag);
+
+            bird.x = slingAnchor.x + Math.cos(angle) * dist;
+            bird.y = slingAnchor.y + Math.sin(angle) * dist;
+        }
+
+        function handleEnd(e) {
+            if (!bird.isDragging) return;
+            bird.isDragging = false;
+
+            const dx = slingAnchor.x - bird.x;
+            const dy = slingAnchor.y - bird.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 15) {
+                resetBirdPos();
+                return;
+            }
+
+            pendingLaunchPower = { x: dx * 0.28, y: dy * 0.28 };
+            openQuizModal();
+        }
+
+        function renderQuestionSentence() {
+            const sentenceEl = document.getElementById('quiz-sentence');
+            const rawSentence = currentQuestion.examples[currentExampleIdx];
+            const fillSentence = rawSentence.replace(currentQuestion.word, '__');
+            const formattedSentence = fillSentence.replace('__', '<span class="text-yellow-400 underline font-black text-base sm:text-lg px-1">__</span>');
+            sentenceEl.innerHTML = formattedSentence;
+        }
+
+        function openQuizModal() {
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            const panel = document.getElementById('quiz-panel');
+            const optionsGrid = document.getElementById('quiz-options');
+            const feedbackEl = document.getElementById('quiz-feedback');
+
+            feedbackEl.innerText = '👇 請選擇最合適的詞語填空：';
+            feedbackEl.className = "text-xs sm:text-sm font-bold text-amber-300 text-center";
+
+            renderQuestionSentence();
+
+            optionsGrid.innerHTML = '';
+            
+            const shuffledOptions = [...currentQuestion.options].sort(() => Math.random() - 0.5);
+
+            shuffledOptions.forEach(opt => {
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-950 font-black text-xs sm:text-sm p-1.5 rounded-xl shadow border-2 border-amber-300 btn-bounce transition flex items-center justify-between min-w-[80px] cursor-pointer touch-manipulation select-none';
+                
+                btnContainer.innerHTML = `
+                    <span class="text-sm sm:text-base font-black text-slate-900 ml-1.5 flex-1 text-left">${opt.word}</span>
+                    <button type="button" class="opt-speech-btn text-amber-900 bg-amber-300/80 hover:bg-amber-400 p-1.5 rounded-lg active:scale-90 transition flex-shrink-0" title="發音">
+                        <i class="fa-solid fa-volume-high text-xs"></i>
+                    </button>
+                `;
+
+                const soundBtn = btnContainer.querySelector('.opt-speech-btn');
+                soundBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    speakWordText(opt.word);
+                };
+
+                btnContainer.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    evaluateAnswer(opt.word);
+                };
+
+                optionsGrid.appendChild(btnContainer);
+            });
+
+            panel.classList.remove('translate-y-full', 'opacity-0', 'pointer-events-none');
+            panel.classList.add('translate-y-0', 'opacity-100', 'pointer-events-auto');
+        }
+
+        function closeQuizModal() {
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    const panel = document.getElementById('quiz-panel');
+
+    panel.classList.add(
+        'translate-y-full',
+        'opacity-0',
+        'pointer-events-none'
+    );
+
+    panel.classList.remove(
+        'translate-y-0',
+        'opacity-100',
+        'pointer-events-auto'
+    );
+}
+
+/* 注意：closeQuizModal 完結後才開始 evaluateAnswer */
+function evaluateAnswer(selectedWord) {
+    const feedbackEl = document.getElementById('quiz-feedback');
+    totalQuestionsAnswered++;
+
+    const currentRecord = questionRecords[currentRound - 1];
+    if (currentRecord) currentRecord.attempts.push(selectedWord);
+
+    const optionsGrid = document.getElementById('quiz-options');
+    optionsGrid.classList.add('pointer-events-none', 'opacity-60');
+
+    if (selectedWord === currentQuestion.word) {
+        hasAnsweredCorrectlyThisRound = true;
+        if (!learnedWords.some(w => w.id === currentQuestion.id)) {
+            learnedWords.push(currentQuestion);
+        }
+
+        // Correct: prepare a different example for this same word for the next shot.
+        currentExampleIdx = pickRandomExampleIdx(currentExampleIdx);
+
+        let secondsLeft = 1;
+        feedbackEl.innerHTML = `✅ 答對了！答案是「<span class="text-yellow-300 font-black text-base sm:text-lg">${currentQuestion.word}</span>」！ <span class="text-amber-200 font-extrabold">${secondsLeft} 秒後</span> 發射石頭！`;
+        feedbackEl.className = 'text-xs sm:text-sm font-black text-emerald-400 text-center';
+
+        countdownInterval = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft > 0) {
+                feedbackEl.innerHTML = `✅ 答對了！答案是「<span class="text-yellow-300 font-black text-base sm:text-lg">${currentQuestion.word}</span>」！ <span class="text-amber-200 font-extrabold">${secondsLeft} 秒後</span> 發射石頭！`;
+            } else {
+                clearInterval(countdownInterval);
+                optionsGrid.classList.remove('pointer-events-none', 'opacity-60');
+                isPowerBoosted = true;
+                bird.vx = pendingLaunchPower.x * 1.55;
+                bird.vy = pendingLaunchPower.y * 1.55;
+                bird.isFlying = true;
+                playSound('launch');
+                closeQuizModal();
+            }
+        }, 1000);
+    } else {
+        mistakenWordIds.add(currentQuestion.id);
+        currentRoundHasMistake = true;
+        playSound('wrong');
+
+        // Wrong: keep the same word and exact same example until correct.
+        feedbackEl.innerHTML = '<span class="text-red-400">❌ 答案不正確！本關卡改為 0 分！</span> <span class="text-yellow-300 ml-1">請再試一次。</span>';
+        feedbackEl.className = 'text-xs sm:text-sm font-bold text-center';
+        renderQuestionSentence();
+        resetBirdPos();
+
+        setTimeout(() => {
+            optionsGrid.classList.remove('pointer-events-none', 'opacity-60');
+        }, 800);
+    }
+}
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 12; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    radius: Math.random() * 4 + 2,
+                    life: 1,
+                    color: color || '#f59e0b'
+                });
+            }
+        }
+
+        function updatePhysics() {
+            const groundY = canvas.height * 0.82;
+
+            if (bird.isFlying) {
+                bird.x += bird.vx;
+                bird.y += bird.vy;
+                bird.vy += 0.32;
+
+                if (bird.x > canvas.width + 100 || bird.y > groundY + 50 || bird.x < -100 || (Math.abs(bird.vx) < 0.1 && Math.abs(bird.vy) < 0.1 && bird.y >= groundY - bird.radius - 5)) {
+                    bird.isFlying = false;
+                    resetBirdPos();
+                    checkRoundCompletion();
+                }
+
+                if (isPowerBoosted) {
+                    particles.push({
+                        x: bird.x,
+                        y: bird.y,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        radius: Math.random() * 5 + 3,
+                        life: 0.8,
+                        color: '#ef4444'
+                    });
+                }
+            }
+
+            particles.forEach((p, idx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.03;
+                if (p.life <= 0) {
+                    particles.splice(idx, 1);
+                }
+            });
+
+            blocks.forEach((block) => {
+                if (block.health <= 0) return;
+
+                let isSupported = false;
+                if (block.y + block.h / 2 >= groundY) {
+                    isSupported = true;
+                } else {
+                    blocks.forEach((other) => {
+                        if (other !== block && other.health > 0) {
+                            const alignX = Math.abs(block.x - other.x) < (block.w + other.w) / 2;
+                            const restOnTop = Math.abs((block.y + block.h / 2) - (other.y - other.h / 2)) < 6;
+                            if (alignX && restOnTop) {
+                                isSupported = true;
+                            }
+                        }
+                    });
+                }
+
+                if (!isSupported || block.vy !== 0 || block.vx !== 0) {
+                    block.vy += 0.28;
+                }
+
+                block.x += block.vx;
+                block.y += block.vy;
+
+                if (block.y + block.h / 2 >= groundY) {
+                    if (Math.abs(block.vy) > 3) {
+                        block.health -= Math.abs(block.vy) * 10;
+                        createExplosion(block.x, block.y, '#d97706');
+                    }
+                    block.y = groundY - block.h / 2;
+                    block.vy = 0;
+                    block.vx *= 0.6;
+                } else {
+                    block.vx *= 0.96;
+                }
+
+                if (bird.isFlying) {
+                    const hit = bird.x + bird.radius > block.x - block.w / 2 &&
+                                bird.x - bird.radius < block.x + block.w / 2 &&
+                                bird.y + bird.radius > block.y - block.h / 2 &&
+                                bird.y - bird.radius < block.y + block.h / 2;
+                    
+                    if (hit) {
+                        const damage = isPowerBoosted ? 100 : 40;
+                        block.health -= damage;
+                        block.vx = bird.vx * 0.45;
+                        block.vy = bird.vy * 0.3;
+                        bird.vx *= 0.8;
+                        bird.vy *= 0.8;
+                        playSound('hit');
+                        createExplosion(block.x, block.y, '#d97706');
+                    }
+                }
+            });
+
+            pigs.forEach((pig) => {
+                if (pig.health <= 0) return;
+
+                let standingOnBlock = null;
+                blocks.forEach(block => {
+                    if (block.health > 0) {
+                        const horizontallyAligned =
+                            pig.x >= block.x - block.w / 2 - 8 &&
+                            pig.x <= block.x + block.w / 2 + 8;
+                        const restingOnTop =
+                            Math.abs((pig.y + pig.radius) - (block.y - block.h / 2)) < 8;
+                        if (horizontallyAligned && restingOnTop) {
+                            standingOnBlock = block;
+                        }
+                    }
+                });
+
+                if (standingOnBlock) {
+                    pig.y = standingOnBlock.y - standingOnBlock.h / 2 - pig.radius;
+                    pig.vy = standingOnBlock.vy;
+                    pig.vx = standingOnBlock.vx;
+                } else {
+                    pig.x += pig.vx;
+                    pig.y += pig.vy;
+                    if (pig.y + pig.radius < groundY) {
+                        pig.vy += 0.28;
+                    } else {
+                        // Ground/wood do not damage pigs.
+                        pig.y = groundY - pig.radius;
+                        pig.vy = 0;
+                        pig.vx *= 0.7;
+                    }
+                }
+
+                // Only direct bird-to-pig collision causes pig damage.
+                if (bird.isFlying) {
+                    const dist = Math.hypot(bird.x - pig.x, bird.y - pig.y);
+                    if (dist < bird.radius + pig.radius) {
+                        const damage = isPowerBoosted ? 120 : 50;
+                        pig.health -= damage;
+                        pig.vx = bird.vx * 0.5;
+                        pig.vy = bird.vy * 0.5 - 2;
+                        bird.vx *= 0.85;
+                        bird.vy *= 0.85;
+                        playSound('hit');
+                        createExplosion(pig.x, pig.y, pig.color);
+                    }
+                }
+            });
+
+            checkRoundCompletion();
+        }
+
+        function checkRoundCompletion() {
+            if (levelCleared) return;
+
+            const allPigsDefeated = pigs.length > 0 && pigs.every(pig => pig.health <= 0);
+            
+            if (allPigsDefeated && hasAnsweredCorrectlyThisRound) {
+                levelCleared = true;
+
+                const roundEarnedScore = currentRoundHasMistake ? 0 : 20;
+                score += roundEarnedScore;
+                const currentRecord = questionRecords[currentRound - 1];
+                if (currentRecord) {
+                    currentRecord.completed = true;
+                    currentRecord.score = roundEarnedScore;
+                    currentRecord.submittedAt = new Date().toISOString();
+                }
+
+                roundScoreStats.push({
+                    round: currentRound,
+                    word: currentQuestion.word,
+                    gainedScore: roundEarnedScore,
+                    hadMistake: currentRoundHasMistake
+                });
+
+                document.getElementById('game-score').innerText = score;
+
+                setTimeout(() => {
+                    showLevelWinModal();
+                }, 500);
+            }
+        }
+
+        function showLevelWinModal() {
+            const modal = document.getElementById('level-win-modal');
+            document.getElementById('win-word-title').innerText = currentQuestion.word;
+            document.getElementById('win-word-meaning').innerText = currentQuestion.meaning;
+            document.getElementById('win-word-example').innerText = currentQuestion.examples[currentExampleIdx] || currentQuestion.examples[0];
+
+            const speakBtn = document.getElementById('win-speech-btn');
+            speakBtn.onclick = () => speakWordText(currentQuestion.word);
+
+            modal.classList.remove('hidden');
+            speakWordText('恭喜你，成功過關！');
+        }
+
+        function nextLevel() {
+            document.getElementById('level-win-modal').classList.add('hidden');
+            
+            if (currentRound < TOTAL_ROUNDS) {
+                currentRound++;
+                setCurrentLevelWord();
+                initLevelStructure();
+            } else {
+                showGameCompleteModal();
+            }
+        }
+
+        function showGameCompleteModal() {
+            document.getElementById('summary-student-name').innerText = `學生：${studentName} (班別：${studentClass})`;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-questions-count').innerText = totalQuestionsAnswered;
+
+            const roundScoresList = document.getElementById('round-scores-list');
+            roundScoresList.innerHTML = '';
+            roundScoreStats.forEach(stat => {
+                const item = document.createElement('div');
+                item.className = 'bg-slate-700/80 rounded-lg p-2 border border-slate-600 flex justify-between items-center';
+                
+                const scoreTag = stat.hadMistake 
+                    ? `<span class="font-black text-red-400 bg-red-950/60 px-2 py-0.5 rounded border border-red-800/60">+0 分 (曾錯題)</span>`
+                    : `<span class="font-black text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">+20 分</span>`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="bg-amber-500 text-slate-900 font-black px-1.5 py-0.5 rounded text-xs">第 ${stat.round} 關</span>
+                        <span class="font-bold text-yellow-300 text-sm">${stat.word}</span>
+                    </div>
+                    ${scoreTag}
+                `;
+                roundScoresList.appendChild(item);
+            });
+
+            const reviewList = document.getElementById('review-words-list');
+            reviewList.innerHTML = '';
+
+            const mistakenWordsArr = VOCAB_DATA.filter(item => mistakenWordIds.has(item.id));
+
+            if (mistakenWordsArr.length === 0) {
+                reviewList.innerHTML = `
+                    <div class="bg-emerald-900/60 border border-emerald-500 rounded-xl p-3 text-center text-emerald-200 font-bold text-xs">
+                        <i class="fa-solid fa-star text-yellow-400 text-base mb-1"></i><br>
+                        太棒了！你全部題目一次答對，取得滿分 100 分！沒有錯題需要重溫！
+                    </div>
+                `;
+            } else {
+                mistakenWordsArr.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-700/90 rounded-xl p-2.5 border border-amber-500/50 space-y-1 text-xs';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-bold text-yellow-300">${item.word}</span>
+                            <button onclick="speakWordText('${item.word}')" class="text-xs bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-bold px-2 py-0.5 rounded flex items-center gap-1 active:scale-95 transition">
+                                <i class="fa-solid fa-volume-high"></i> 發音
+                            </button>
+                        </div>
+                        <p class="text-slate-300"><span class="text-amber-400 font-bold">解釋：</span>${item.meaning}</p>
+                        <p class="text-emerald-300 italic"><span class="text-emerald-400 font-bold">例句：</span>${item.examples[0]}</p>
+                    `;
+                    reviewList.appendChild(card);
+                });
+            }
+
+            document.getElementById('game-complete-modal').classList.remove('hidden');
+        }
+
+        function restartFullGame() {
+            currentRound = 1;
+            score = 0;
+            learnedWords = [];
+            mistakenWordIds.clear();
+            currentRoundHasMistake = false;
+            roundScoreStats = [];
+            totalQuestionsAnswered = 0;
+            questionRecords = [];
+
+            document.getElementById('level-win-modal').classList.add('hidden');
+            document.getElementById('game-complete-modal').classList.add('hidden');
+            closeQuizModal();
+            selectQuestionsForGame();
+            setCurrentLevelWord();
+            initLevelStructure();
+        }
+
+        function drawCanvas() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const groundY = h * 0.82;
+
+            ctx.clearRect(0, 0, w, h);
+
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+            skyGrad.addColorStop(0, '#7dd3fc');
+            skyGrad.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, groundY);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath();
+            ctx.arc(w * 0.2, h * 0.2, 25, 0, Math.PI * 2);
+            ctx.arc(w * 0.23, h * 0.18, 30, 0, Math.PI * 2);
+            ctx.arc(w * 0.27, h * 0.2, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(w * 0.75, h * 0.15, 20, 0, Math.PI * 2);
+            ctx.arc(w * 0.78, h * 0.13, 26, 0, Math.PI * 2);
+            ctx.arc(w * 0.81, h * 0.15, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            const groundGrad = ctx.createLinearGradient(0, groundY, 0, h);
+            groundGrad.addColorStop(0, '#22c55e');
+            groundGrad.addColorStop(0.15, '#16a34a');
+            groundGrad.addColorStop(1, '#15803d');
+            ctx.fillStyle = groundGrad;
+            ctx.fillRect(0, groundY, w, h - groundY);
+
+            ctx.strokeStyle = '#15803d';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(w, groundY);
+            ctx.stroke();
+
+            if (bird.isDragging) {
+                ctx.strokeStyle = '#78350f';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(slingAnchor.x - 10, slingAnchor.y - 10);
+                ctx.lineTo(bird.x, bird.y);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(slingAnchor.x - 8, slingAnchor.y - 10, 16, 80);
+            ctx.beginPath();
+            ctx.moveTo(slingAnchor.x - 18, slingAnchor.y - 30);
+            ctx.lineTo(slingAnchor.x - 6, slingAnchor.y - 10);
+            ctx.lineTo(slingAnchor.x + 6, slingAnchor.y - 10);
+            ctx.lineTo(slingAnchor.x + 18, slingAnchor.y - 30);
+            ctx.lineTo(slingAnchor.x + 10, slingAnchor.y - 30);
+            ctx.lineTo(slingAnchor.x, slingAnchor.y - 18);
+            ctx.lineTo(slingAnchor.x - 10, slingAnchor.y - 30);
+            ctx.closePath();
+            ctx.fill();
+
+            if (bird.isDragging) {
+                ctx.strokeStyle = '#451a03';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(slingAnchor.x + 10, slingAnchor.y - 10);
+                ctx.lineTo(bird.x, bird.y);
+                ctx.stroke();
+            }
+
+            if (bird.isDragging) {
+                const dx = slingAnchor.x - bird.x;
+                const dy = slingAnchor.y - bird.y;
+                let simX = slingAnchor.x;
+                let simY = slingAnchor.y;
+                let simVx = dx * 0.43;
+                let simVy = dy * 0.43;
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                for (let i = 0; i < 12; i++) {
+                    simX += simVx;
+                    simY += simVy;
+                    simVy += 0.32;
+                    ctx.beginPath();
+                    ctx.arc(simX, simY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            blocks.forEach(block => {
+                if (block.health <= 0) return;
+                ctx.fillStyle = block.color;
+                ctx.strokeStyle = '#451a03';
+                ctx.lineWidth = 2;
+                ctx.fillRect(block.x - block.w / 2, block.y - block.h / 2, block.w, block.h);
+                ctx.strokeRect(block.x - block.w / 2, block.y - block.h / 2, block.w, block.h);
+
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                ctx.beginPath();
+                ctx.moveTo(block.x - block.w / 2 + 3, block.y);
+                ctx.lineTo(block.x + block.w / 2 - 3, block.y);
+                ctx.stroke();
+            });
+
+            pigs.forEach(pig => {
+                if (pig.health <= 0) return;
+
+                ctx.fillStyle = pig.color;
+                ctx.beginPath();
+                ctx.arc(pig.x, pig.y, pig.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#14532d';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(pig.x - 5, pig.y - 4, 4, 0, Math.PI * 2);
+                ctx.arc(pig.x + 5, pig.y - 4, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(pig.x - 4, pig.y - 4, 2, 0, Math.PI * 2);
+                ctx.arc(pig.x + 4, pig.y - 4, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#4ade80';
+                ctx.beginPath();
+                ctx.ellipse(pig.x, pig.y + 3, 6, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#15803d';
+                ctx.beginPath();
+                ctx.arc(pig.x - 2, pig.y + 3, 1.2, 0, Math.PI * 2);
+                ctx.arc(pig.x + 2, pig.y + 3, 1.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (pig.type === 'crown') {
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath();
+                    ctx.moveTo(pig.x - 10, pig.y - pig.radius + 2);
+                    ctx.lineTo(pig.x - 12, pig.y - pig.radius - 10);
+                    ctx.lineTo(pig.x - 4, pig.y - pig.radius - 4);
+                    ctx.lineTo(pig.x, pig.y - pig.radius - 12);
+                    ctx.lineTo(pig.x + 4, pig.y - pig.radius - 4);
+                    ctx.lineTo(pig.x + 12, pig.y - pig.radius - 10);
+                    ctx.lineTo(pig.x + 10, pig.y - pig.radius + 2);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (pig.type === 'helmet') {
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.arc(pig.x, pig.y - 2, pig.radius + 1, Math.PI, 0);
+                    ctx.fill();
+                }
+            });
+
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            const rockGradient = ctx.createLinearGradient(-18, -18, 18, 18);
+            rockGradient.addColorStop(0, '#cbd5e1');
+            rockGradient.addColorStop(0.5, '#64748b');
+            rockGradient.addColorStop(1, '#334155');
+            ctx.fillStyle = rockGradient;
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-18, -5);
+            ctx.lineTo(-11, -17);
+            ctx.lineTo(4, -19);
+            ctx.lineTo(17, -8);
+            ctx.lineTo(19, 7);
+            ctx.lineTo(8, 17);
+            ctx.lineTo(-9, 16);
+            ctx.lineTo(-19, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.moveTo(-11, -7);
+            ctx.lineTo(-3, -12);
+            ctx.lineTo(5, -8);
+            ctx.stroke();
+            ctx.strokeStyle = '#475569';
+            ctx.beginPath();
+            ctx.moveTo(4, -4);
+            ctx.lineTo(-2, 4);
+            ctx.lineTo(6, 10);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            updatePhysics();
+            drawCanvas();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            initVoices();
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+
+            canvas.addEventListener('mousedown', handleStart);
+            canvas.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
+
+            canvas.addEventListener('touchstart', handleStart, { passive: false });
+            canvas.addEventListener('touchmove', handleMove, { passive: false });
+            window.addEventListener('touchend', handleEnd);
+
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+            });
+
+            resizeCanvas();
+            selectQuestionsForGame();
+            setCurrentLevelWord();
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
